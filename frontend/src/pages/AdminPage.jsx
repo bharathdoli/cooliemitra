@@ -1,3 +1,4 @@
+// client/src/pages/AdminPage.jsx
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
@@ -9,6 +10,7 @@ const AdminPage = () => {
   const [pendingWorkers, setPendingWorkers] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedWorkers, setSelectedWorkers] = useState([]);
+  const [expandedWorker, setExpandedWorker] = useState(null);
 
   useEffect(() => {
     axios
@@ -25,6 +27,14 @@ const AdminPage = () => {
     if (!dateStr) return '—';
     const date = new Date(dateStr);
     return isNaN(date) ? '—' : date.toLocaleString();
+  };
+
+  const getSessionCount = (workHistory) => {
+    return workHistory ? workHistory.filter((session) => session.endTime).length : 0;
+  };
+
+  const toggleExpandWorker = (workerId) => {
+    setExpandedWorker(expandedWorker === workerId ? null : workerId);
   };
 
   const handleAccept = async (id) => {
@@ -96,9 +106,17 @@ const AdminPage = () => {
       animate={{ opacity: 1 }}
       className="p-8 min-h-screen bg-gray-100 dark:bg-gray-900"
     >
-      <h1 className="text-3xl font-bold mb-6 text-gray-800 dark:text-white">
-        Admin Dashboard
-      </h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
+          Admin Dashboard
+        </h1>
+        <Link
+          to="/analytics"
+          className="bg-secondary text-white px-4 py-2 rounded hover:bg-green-700"
+        >
+          View Analytics
+        </Link>
+      </div>
 
       {/* Search Bar */}
       <div className="mb-6">
@@ -210,26 +228,61 @@ const AdminPage = () => {
           <thead>
             <tr className="bg-primary text-white dark:bg-gray-700">
               <th className="px-4 py-2">Worker</th>
-              <th className="px-4 py-2">Start Time</th>
-              <th className="px-4 py-2">End Time</th>
+              <th className="px-4 py-2">Sessions Worked</th>
               <th className="px-4 py-2">Paid</th>
             </tr>
           </thead>
           <tbody>
             {filteredWorkers.map((w) => (
-              <tr key={w._id} className="text-center border-t dark:border-gray-700">
-                <td className="px-4 py-2">
-                  <Link
-                    to={`/worker-profile/${w._id}`}
-                    className="text-secondary hover:underline"
-                  >
-                    {w.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-2">{formatDate(w.startTime)}</td>
-                <td className="px-4 py-2">{formatDate(w.endTime)}</td>
-                <td className="px-4 py-2">{w.isPaid ? 'Yes' : 'No'}</td>
-              </tr>
+              <React.Fragment key={w._id}>
+                <tr className="text-center border-t dark:border-gray-700">
+                  <td className="px-4 py-2 text-white">
+                    <Link
+                      to={`/worker-profile/${w._id}`}
+                      className="text-white hover:underline"
+                      onClick={() => toggleExpandWorker(w._id)}
+                    >
+                      {w.name}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2 text-white">
+                    {getSessionCount(w.workHistory)}
+                    {w.workHistory?.length > 0 && (
+                      <button
+                        onClick={() => toggleExpandWorker(w._id)}
+                        className="ml-2 text-secondary hover:underline"
+                      >
+                        {expandedWorker === w._id ? 'Hide' : 'Show'} Sessions
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-white">{w.isPaid ? 'Yes' : 'No'}</td>
+                </tr>
+                {expandedWorker === w._id && w.workHistory?.length > 0 && (
+                  <tr className="border-t dark:border-gray-700">
+                    <td colSpan="3" className="px-4 py-2 text-white">
+                      <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded">
+                        <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+                          Session Details
+                        </h4>
+                        <ul className="space-y-2">
+                          {w.workHistory
+                            .filter((session) => session.startTime)
+                            .sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
+                            .map((session, index) => (
+                              <li key={index} className="text-gray-800 dark:text-white">
+                                <span>
+                                  Session {index + 1}: Start: {formatDate(session.startTime)}, End:{' '}
+                                  {formatDate(session.endTime)}
+                                </span>
+                              </li>
+                            ))}
+                        </ul>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>

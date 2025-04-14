@@ -1,18 +1,27 @@
-import mongoose from 'mongoose'
+// server/models/Worker.js
+import mongoose from 'mongoose';
 
-const workerSchema = new mongoose.Schema({
-  name: String,
-  phone: String,
-  username: { type: String, unique: true },
-  password: String,
-  skills: [String],
-  photo: String,
-  isPaid: Boolean,
-  startTime: Date,
-  endTime: Date,
-  status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
+const WorkerSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  phone: { type: String, required: true },
+  username: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  skills: { type: [String], default: [] },
+  photo: { type: String },
+  isPaid: { type: Boolean, default: false },
+  status: { type: String, default: 'pending' },
+  workHistory: [
+    {
+      startTime: { type: Date, required: true },
+      endTime: { type: Date },
+      breaks: [
+        {
+          start: { type: Date },
+          end: { type: Date },
+        },
+      ],
+    },
+  ],
 });
 
-const Worker = mongoose.model('Worker', workerSchema)
-
-export default Worker
+export default mongoose.model('Worker', WorkerSchema);

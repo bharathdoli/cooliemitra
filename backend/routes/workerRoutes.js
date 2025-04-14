@@ -1,6 +1,8 @@
+// server/routes/workerRoutes.js
 import express from 'express';
 import multer from 'multer';
 import Worker from '../models/Worker.js';
+import { predictWorkHours } from '../services/mlService.js';
 
 const router = express.Router();
 
@@ -37,9 +39,8 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       skills: skills ? skills.split(',').map(s => s.trim()) : [],
       photo,
       isPaid: false,
-      startTime: null,
-      endTime: null,
       status: 'pending',
+      workHistory: [],
     });
 
     const saved = await newWorker.save();
@@ -118,38 +119,112 @@ router.post('/:id/reject', async (req, res) => {
 });
 
 /**
- * @route   POST /api/workers/:id/start
- * @desc    Start work for worker
+ * @route   POST /api/workers/start-session
+ * @desc    Start work session for worker
  */
-router.post('/:id/start', async (req, res) => {
+router.post('/start-session', async (req, res) => {
   try {
-    const worker = await Worker.findByIdAndUpdate(
-      req.params.id,
-      { startTime: new Date(), endTime: null },
-      { new: true }
-    );
+    const { workerId } = req.body;
+    const worker = await Worker.findById(workerId);
     if (!worker) return res.status(404).json({ error: 'Worker not found' });
-    res.json(worker);
+
+    // Check if there's an ongoing session
+    const ongoingSession = worker.workHistory.find(s => !s.endTime);
+    if (ongoingSession) {
+      return res.status(400).json({ error: 'Worker already has an active session' });
+    }
+
+    const session = {
+      startTime: new Date(),
+      breaks: [],
+    };
+    worker.workHistory.push(session);
+    await worker.save();
+    res.json(session);
   } catch (err) {
-    res.status(500).json({ error: 'Error starting work' });
+    console.error(err);
+    res.status(500).json({ error: 'Error starting work session' });
   }
 });
 
 /**
- * @route   POST /api/workers/:id/stop
- * @desc    Stop work for worker
+ * @route   POST /api/workers/stop-session
+ * @desc    Stop work session for worker
  */
-router.post('/:id/stop', async (req, res) => {
+router.post('/stop-session', async (req, res) => {
   try {
-    const worker = await Worker.findByIdAndUpdate(
-      req.params.id,
-      { endTime: new Date() },
-      { new: true }
-    );
+    const { workerId } = req.body;
+    const worker = await Worker.findById(workerId);
     if (!worker) return res.status(404).json({ error: 'Worker not found' });
-    res.json(worker);
+
+    const ongoingSession = worker.workHistory.find(s => !s.endTime);
+    if (!ongoingSession) {
+      return res.status(400).json({ error: 'No active session to stop' });
+    }
+
+    ongoingSession.endTime = new Date();
+    await worker.save();
+    res.json(ongoingSession);
   } catch (err) {
-    res.status(500).json({ error: 'Error stopping work' });
+    console.error(err);
+    res.status(500).json({ error: 'Error stopping work session' });
+  }
+});
+
+/**
+ * @route   POST /api/workers/start-break
+ * @desc    Start a break in the current session
+ */
+router.post('/start-break', async (req, res) => {
+  try {
+    const { workerId } = req.body;
+    const worker = await Worker.findById(workerId);
+    if (!worker) {
+      return res.status(404).json({ error: 'Worker not found' });
+    }
+    const ongoingSession = worker.workHistory.find((session) => !session.endTime);
+    if (!ongoingSession) {
+      return res.status(400).json({ error: 'No active session' });
+    }
+    const ongoingBreak = ongoingSession.breaks.find((b) => !b.end);
+    if (ongoingBreak) {
+      return res.status(400).json({ error: 'Break already active' });
+    }
+    const newBreak = { start: new Date() };
+    ongoingSession.breaks.push(newBreak);
+    await worker.save();
+    res.json(newBreak);
+  } catch (err) {
+    console.error('Start break error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * @route   POST /api/workers/end-break
+ * @desc    End a break in the current session
+ */
+router.post('/end-break', async (req, res) => {
+  try {
+    const { workerId } = req.body;
+    const worker = await Worker.findById(workerId);
+    if (!worker) {
+      return res.status(404).json({ error: 'Worker not found' });
+    }
+    const ongoingSession = worker.workHistory.find((session) => !session.endTime);
+    if (!ongoingSession) {
+      return res.status(400).json({ error: 'No active session' });
+    }
+    const ongoingBreak = ongoingSession.breaks.find((b) => !b.end);
+    if (!ongoingBreak) {
+      return res.status(400).json({ error: 'No active break' });
+    }
+    ongoingBreak.end = new Date();
+    await worker.save();
+    res.json(ongoingBreak);
+  } catch (err) {
+    console.error('End break error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -164,6 +239,24 @@ router.get('/:id', async (req, res) => {
     res.json(worker);
   } catch (err) {
     res.status(500).json({ error: 'Error fetching worker' });
+  }
+});
+
+/**
+ * @route   GET /api/workers/:id/predict-hours
+ * @desc    Predict hours for a worker's next session
+ */
+router.get('/:id/predict-hours', async (req, res) => {
+  try {
+    const worker = await Worker.findById(req.params.id);
+    if (!worker) {
+      return res.status(404).json({ error: 'Worker not found' });
+    }
+    const prediction = await predictWorkHours(worker.toObject());
+    res.json({ predictedHours: prediction });
+  } catch (err) {
+    console.error('Prediction error:', err);
+    res.status(500).json({ error: 'Failed to predict hours' });
   }
 });
 
