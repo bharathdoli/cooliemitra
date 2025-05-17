@@ -4,15 +4,22 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
+import RecommendedTasks from '../components/RecommendedTasks';
+import SearchTasks from '../components/SearchTasks';
+import AvailableTasks from '../components/AvailableTasks';
+import ActiveTasks from '../components/ActiveTasks';
+import CompletedTasks from '../components/CompletedTasks';
 
 const WorkerProfile = () => {
   const { id } = useParams();
   const [worker, setWorker] = useState(null);
   const [isWorking, setIsWorking] = useState(false);
-  const [isOnBreak, setIsOnBreak] = useState(false); // Fixed: setIsWorking → setIsOnBreak
+  const [isOnBreak, setIsOnBreak] = useState(false);
   const [sessionTime, setSessionTime] = useState(0);
   const [currentSession, setCurrentSession] = useState(null);
   const [predictedHours, setPredictedHours] = useState(3.0);
+  const [tasks, setTasks] = useState([]);
+  const [activeTab, setActiveTab] = useState('search'); // ['search', 'available', 'active', 'completed']
 
   const fetchWorker = async () => {
     try {
@@ -125,6 +132,15 @@ const WorkerProfile = () => {
   );
   console.log('hasShortSessions:', hasShortSessions, 'predictedHours:', predictedHours);
 
+  const handleTasksFound = (foundTasks) => {
+    setTasks(foundTasks);
+  };
+
+  const handleTaskAccepted = () => {
+    // Refresh active tasks when a new task is accepted
+    setActiveTab('active');
+  };
+
   if (!worker) return <div>Loading...</div>;
 
   return (
@@ -133,28 +149,42 @@ const WorkerProfile = () => {
       animate={{ opacity: 1 }}
       className="min-h-screen bg-gray-100 dark:bg-gray-900 p-8"
     >
-      <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-        <div className="flex flex-col md:flex-row items-center">
-          <img
-            src={worker.photo ? `http://localhost:5000/${worker.photo}` : '/images/worker-placeholder.png'}
-            alt={worker.name}
-            className="w-32 h-32 rounded-full mb-4 md:mb-0 md:mr-6"
-          />
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{worker.name}</h1>
-            <p className="text-gray-600 dark:text-gray-300">Phone: {worker.phone}</p>
-            <p className="text-gray-600 dark:text-gray-300">Skills: {worker.skills?.join(', ') || 'None'}</p>
-            <p className="text-gray-600 dark:text-gray-300">Status: {worker.status}</p>
-            <p className="text-gray-600 dark:text-gray-300">
-              Predicted Hours for Next Session: {predictedHours.toFixed(1)} hours
-              {hasShortSessions && (
-                <span className="text-yellow-600"> (Scaled for short sessions)</span>
-              )}
-            </p>
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <div className="flex flex-col md:flex-row items-center">
+            <img
+              src={worker.photo ? `http://localhost:5000/${worker.photo}` : '/images/worker-placeholder.png'}
+              alt={worker.name}
+              className="w-32 h-32 rounded-full mb-4 md:mb-0 md:mr-6"
+            />
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{worker.name}</h1>
+              <p className="text-gray-600 dark:text-gray-300">Phone: {worker.phone}</p>
+              <div className="mt-2">
+                <p className="text-gray-600 dark:text-gray-300">Skills:</p>
+                <ul className="list-disc list-inside text-gray-600 dark:text-gray-300">
+                  {worker.skills?.map((skill, index) => (
+                    <li key={index}>
+                      {skill.name} ({skill.level}) - {skill.yearsOfExperience} years
+                      {skill.certifications?.length > 0 && (
+                        <span> - Certifications: {skill.certifications.join(', ')}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <p className="text-gray-600 dark:text-gray-300">Status: {worker.status}</p>
+              <p className="text-gray-600 dark:text-gray-300">
+                Predicted Hours for Next Session: {predictedHours.toFixed(1)} hours
+                {hasShortSessions && (
+                  <span className="text-yellow-600"> (Scaled for short sessions)</span>
+                )}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="mt-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
           <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-white">Work Session</h2>
           <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
             <p className="text-lg text-gray-800 dark:text-white">
@@ -186,7 +216,68 @@ const WorkerProfile = () => {
           </div>
         </div>
 
-        <div className="mt-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+            <nav className="flex space-x-4">
+              <button
+                onClick={() => setActiveTab('search')}
+                className={`py-2 px-4 ${
+                  activeTab === 'search'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Search Tasks
+              </button>
+              <button
+                onClick={() => setActiveTab('available')}
+                className={`py-2 px-4 ${
+                  activeTab === 'available'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Available Tasks
+              </button>
+              <button
+                onClick={() => setActiveTab('active')}
+                className={`py-2 px-4 ${
+                  activeTab === 'active'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Active Tasks
+              </button>
+              <button
+                onClick={() => setActiveTab('completed')}
+                className={`py-2 px-4 ${
+                  activeTab === 'completed'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Completed Tasks
+              </button>
+            </nav>
+          </div>
+
+          {activeTab === 'search' && (
+            <>
+              <SearchTasks onTasksFound={handleTasksFound} />
+              <div className="mt-6">
+                <RecommendedTasks workerId={id} tasks={tasks} />
+              </div>
+            </>
+          )}
+          {activeTab === 'available' && (
+            <AvailableTasks workerId={id} onTaskAccepted={handleTaskAccepted} />
+          )}
+          {activeTab === 'active' && <ActiveTasks workerId={id} />}
+          {activeTab === 'completed' && <CompletedTasks workerId={id} />}
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
           <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-white">Work History</h2>
           {worker.workHistory?.length > 0 ? (
             <ul className="space-y-4">
@@ -202,7 +293,25 @@ const WorkerProfile = () => {
                     </p>
                     {session.endTime && (
                       <p className="text-gray-800 dark:text-white">
-                        Duration: {((new Date(session.endTime) - new Date(session.startTime)) / (1000 * 60 * 60)).toFixed(2)} hours
+                        Duration:{' '}
+                        {(
+                          (new Date(session.endTime) - new Date(session.startTime)) /
+                          (1000 * 60 * 60)
+                        ).toFixed(2)}{' '}
+                        hours
+                      </p>
+                    )}
+                    {session.taskType && (
+                      <p className="text-gray-800 dark:text-white">Task Type: {session.taskType}</p>
+                    )}
+                    {session.taskDifficulty && (
+                      <p className="text-gray-800 dark:text-white">
+                        Difficulty: {session.taskDifficulty}
+                      </p>
+                    )}
+                    {session.performanceRating && (
+                      <p className="text-gray-800 dark:text-white">
+                        Performance Rating: {session.performanceRating}/5
                       </p>
                     )}
                     <p className="text-gray-800 dark:text-white">

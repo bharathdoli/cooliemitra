@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 // Routes
 import workerRoutes from './routes/workerRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import taskRoutes from './routes/taskRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Routes
 app.use('/api/workers', workerRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/tasks', taskRoutes);
 
 // DB + Server Init
 mongoose
